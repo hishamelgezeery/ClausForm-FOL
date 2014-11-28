@@ -24,38 +24,104 @@ public class AIProject {
 		// String FOLSentence = sc.nextLine();
 
 		String test = "$xy [ p(x) <=> q(x) ^ [ Q(x) ^ &y [ Q(y) ^ R(y, x) ] ] ] ";
-		String test2 = "[ [ p(x) ] <=> q(x) ]";
+		String test2 = "[ [ p(x) ] => q(x) ]";
+		String test3 = "[ ! ! p ] => [ ! ! q ]";
 		AIProject a = new AIProject();
-		a.clauseForm(test2);
+		a.clauseForm(test3);
 
-	}
-
-	public ArrayList ArrayToArrayList(String[] array) {
-		ArrayList<String> wordList = new ArrayList<String>();
-
-		for (String e : array) {
-			wordList.add(e);
-		}
-		return wordList;
 	}
 
 	public void clauseForm(String FOLSentence) {
 		String[] tempElements = FOLSentence.split(" ");
 		ArrayList<String> elements = ArrayToArrayList(tempElements);
 
-		if (elements.contains(EQUIVALENCE)) {
+		while (elements.contains(EQUIVALENCE)) {
 			elements = removeEquiv(elements);
 			printArrayList(elements);
 		}
 
-	}
-	
-	
-	
-	
-	
-	//REMOVE EQUIVELENCE/////////////////////////////
+		while (elements.contains(IMPLICATION)) {
+			elements = removeImplication(elements);
+		}
 
+		while (!notInwardsFinished(elements)){
+			elements = pushNotInwards(elements);
+			System.out.println("still here");
+		}
+		
+		System.out.println(elements);
+
+	}
+
+	private ArrayList<String> pushNotInwards(ArrayList<String> elements) {
+		//case 1 - two nots followed by each other - remove both
+		ArrayList<String> twoNots = new ArrayList<String>(2);
+		twoNots.add(NOT); twoNots.add(NOT);
+		elements.removeAll(twoNots);
+		
+		//case 2 - not followed by a bracketed expression eg ! ( p v q )
+		
+		return elements;
+	}
+
+	private boolean notInwardsFinished(ArrayList<String> elements) {
+		boolean finished = true;
+		for (int i = 0; i < elements.size() - 1; i++) {
+			if(elements.get(i).equals(NOT) && !Character.isLetter(elements.get(i+1).charAt(0))){
+				finished = false;
+			}
+		}
+		return finished;
+	}
+
+	private ArrayList<String> removeImplication(ArrayList<String> inputString) {
+		int implicationIndex = inputString.indexOf(IMPLICATION);
+		// case of two functions eg. p(x) => q(x)
+		if (!inputString.get(implicationIndex - 1).equals(RIGHT_SQUARE_BRACKET)
+				&& !inputString.get(implicationIndex + 1).equals(
+						LEFT_SQUARE_BRACKET)) {
+			inputString = removeImplCaseOneThree(inputString, implicationIndex);
+		}
+		// case of two bracketed parameters eg. [p(x)^q(x)]=>[q(y)^q(z)]
+		if (inputString.get(implicationIndex - 1).equals(RIGHT_SQUARE_BRACKET)
+				&& inputString.get(implicationIndex + 1).equals(
+						LEFT_SQUARE_BRACKET)) {
+			inputString = removeImplCaseTwoFour(inputString, implicationIndex);
+		}
+		// case of two bracketed parameters eg. [p(x)^q(x)]<=>[q(y)^q(z)]
+		if (!inputString.get(implicationIndex - 1).equals(RIGHT_SQUARE_BRACKET)
+				&& inputString.get(implicationIndex + 1).equals(
+						LEFT_SQUARE_BRACKET)) {
+			inputString = removeImplCaseOneThree(inputString, implicationIndex);
+		}
+		if (!inputString.get(implicationIndex + 1).equals(LEFT_SQUARE_BRACKET)
+				&& inputString.get(implicationIndex - 1).equals(
+						RIGHT_SQUARE_BRACKET)) {
+			inputString = removeImplCaseTwoFour(inputString, implicationIndex);
+		}
+
+		return inputString;
+	}
+
+	private ArrayList<String> removeImplCaseOneThree(
+			ArrayList<String> inputString, int implicationIndex) {
+		inputString.set(implicationIndex, OR);
+		inputString.add(implicationIndex - 1, NOT);
+		return inputString;
+	}
+
+	private ArrayList<String> removeImplCaseTwoFour(
+			ArrayList<String> inputString, int implicationIndex) {
+		inputString.set(implicationIndex, OR);
+		int index = implicationIndex - 1;
+		while (!inputString.get(index).equals(LEFT_SQUARE_BRACKET)) {
+			index--;
+		}
+		inputString.add(index, NOT);
+		return inputString;
+	}
+
+	// REMOVE EQUIVELENCE/////////////////////////////
 	public ArrayList<String> removeEquiv(ArrayList<String> inputString) {
 		int equivIndex = inputString.indexOf(EQUIVALENCE);
 		// case of two functions eg. p(x) <=> q(x)
@@ -81,13 +147,6 @@ public class AIProject {
 		return inputString;
 	}
 
-	
-	
-	
-	public void getOperands(){
-		
-	}
-
 	public ArrayList<String> removeEquivCaseOne(ArrayList<String> inputString,
 			int equivIndex) {
 		int beginIndex = equivIndex - 1;
@@ -108,7 +167,6 @@ public class AIProject {
 		return inputString;
 
 	}
-	
 
 	public ArrayList<String> removeEquivCaseTwo(ArrayList<String> inputString,
 			int equivIndex) {
@@ -141,35 +199,36 @@ public class AIProject {
 	}
 
 	// removing case p(x) <=> [q(x)]
-		public ArrayList<String> removeEquivCaseThree(
-				ArrayList<String> inputString, int equivIndex) {
-
-			ArrayList<String> operand1 = new ArrayList<String>();
-			operand1.add(inputString.get(equivIndex - 1));
-			ArrayList<String> operand2 = new ArrayList<String>();
-
-			int index = equivIndex + 1;
-			int beginIndex = equivIndex - 1;
-			int endIndex = -1;
-			while (!inputString.get(index).equals(RIGHT_SQUARE_BRACKET)) {
-				operand2.add(inputString.get(index));
-				index++;
-			}
-			endIndex = index;
-			operand2.add(RIGHT_SQUARE_BRACKET);
-			ArrayList<String> temp = createEquivAlt(operand1, operand2);
-
-			// removing old parameter
-			inputString = removeIndicies(inputString, beginIndex, endIndex);
-
-			inputString.addAll(beginIndex - 1, temp);
-			printArrayList(inputString);
-			return inputString;
-
-		}
-	//[p(x)]<==> q(x)
-	public ArrayList<String> removeEquivCaseFour(
+	public ArrayList<String> removeEquivCaseThree(
 			ArrayList<String> inputString, int equivIndex) {
+
+		ArrayList<String> operand1 = new ArrayList<String>();
+		operand1.add(inputString.get(equivIndex - 1));
+		ArrayList<String> operand2 = new ArrayList<String>();
+
+		int index = equivIndex + 1;
+		int beginIndex = equivIndex - 1;
+		int endIndex = -1;
+		while (!inputString.get(index).equals(RIGHT_SQUARE_BRACKET)) {
+			operand2.add(inputString.get(index));
+			index++;
+		}
+		endIndex = index;
+		operand2.add(RIGHT_SQUARE_BRACKET);
+		ArrayList<String> temp = createEquivAlt(operand1, operand2);
+
+		// removing old parameter
+		inputString = removeIndicies(inputString, beginIndex, endIndex);
+
+		inputString.addAll(beginIndex - 1, temp);
+		printArrayList(inputString);
+		return inputString;
+
+	}
+
+	// [p(x)]<==> q(x)
+	public ArrayList<String> removeEquivCaseFour(ArrayList<String> inputString,
+			int equivIndex) {
 		ArrayList<String> operand1 = new ArrayList<String>();
 		ArrayList<String> operand2 = new ArrayList<String>();
 		operand2.add(inputString.get(equivIndex + 1));
@@ -178,22 +237,22 @@ public class AIProject {
 		int endIndex = equivIndex + 1;
 		int beginIndex = -1;
 		while (!inputString.get(index).equals(LEFT_SQUARE_BRACKET)) {
-			operand1.add(0,inputString.get(index));
+			operand1.add(0, inputString.get(index));
 			index--;
 		}
 		beginIndex = index;
-		operand1.add(0,LEFT_SQUARE_BRACKET);
+		operand1.add(0, LEFT_SQUARE_BRACKET);
 		ArrayList<String> temp = createEquivAlt(operand1, operand2);
-		
+
 		// removing old parameter
 		inputString = removeIndicies(inputString, beginIndex, endIndex);
-		
+
 		inputString.addAll(beginIndex - 1, temp);
 		System.out.println("sss");
 		return inputString;
 
 	}
-	
+
 	public ArrayList<String> removeIndicies(ArrayList<String> original,
 			int beginIndex, int endIndex) {
 		ArrayList<String> remove = new ArrayList<String>();
@@ -232,8 +291,6 @@ public class AIProject {
 		return temp;
 	}
 
-
-	
 	public void printArrayList(ArrayList<String> arraylist) {
 		String output = "";
 
@@ -242,4 +299,14 @@ public class AIProject {
 		}
 		System.out.println(output);
 	}
+
+	public ArrayList<String> ArrayToArrayList(String[] array) {
+		ArrayList<String> wordList = new ArrayList<String>();
+
+		for (String e : array) {
+			wordList.add(e);
+		}
+		return wordList;
+	}
+
 }
