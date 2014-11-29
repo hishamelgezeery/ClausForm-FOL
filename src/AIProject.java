@@ -1,5 +1,8 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Random;
 import java.util.Scanner;
 
 public class AIProject {
@@ -24,10 +27,12 @@ public class AIProject {
 		// String FOLSentence = sc.nextLine();
 
 		String test = "$xy [ p(x) <=> q(x) ^ [ Q(x) ^ &y [ Q(y) ^ R(y, x) ] ] ] ";
-		String test2 = "[ [ p(x) ] => q(x) ]";
-		String test3 = "[ ! ! p ] => [ ! ! q ]";
+		String testIMPLIES = "[ [ p(x) ] => q(x) ]";
+		String testNOT = "[ ! ! p ] => [ ! ! q ]";
+		String testVARIABLES = "$ xy [ x ^ y ] | & yst [ p(y) ^ s ^ x ] ^ & sy [ s ^ y ] | $ ts [ t ^ s ] ";
+		String testVARIABLES2 = "$ x [ p(x) ^ $ x [ q(x) ^ p(x) ] ]";
 		AIProject a = new AIProject();
-		a.clauseForm(test3);
+		a.clauseForm(testVARIABLES2);
 
 	}
 
@@ -44,30 +49,198 @@ public class AIProject {
 			elements = removeImplication(elements);
 		}
 
-		while (!notInwardsFinished(elements)){
-			elements = pushNotInwards(elements);
-			System.out.println("still here");
+		// while (!notInwardsFinished(elements)) {
+		// elements = pushNotInwards(elements);
+		// System.out.println("still here");
+		// }
+		while (elements.contains(IMPLICATION)) {
+			elements = removeImplication(elements);
 		}
-		
-		System.out.println(elements);
+
+		if (elements.contains(FORALL) || elements.contains(THERE_EXISTS)) {
+			int firstQuantifier = firstQuantifier(elements);
+			elements = addVariables(elements, firstQuantifier);
+		}
+
+		printArrayList(elements);
 
 	}
 
+	// calculating index of the 1st quantifier in arraylist
+	private int firstQuantifier(ArrayList<String> inputString) {
+		int temp;
+		int firstQuantifier = -1;
+
+		if (inputString.contains(FORALL)) {
+
+			firstQuantifier = inputString.indexOf(FORALL);
+		}
+
+		if (inputString.contains(THERE_EXISTS)) {
+			temp = inputString.indexOf(THERE_EXISTS);
+
+			if (temp < firstQuantifier || firstQuantifier == -1) {
+				firstQuantifier = temp;
+			}
+
+		}
+		return firstQuantifier;
+
+	}
+
+	// adding variables
+	private ArrayList<String> addVariables(ArrayList<String> inputString,
+			int indexFirstQuantifier) {
+
+		// initialization for 1st quantifier
+
+		ArrayList<String> editInput = new ArrayList<String>();
+		ArrayList<String> allVariables = new ArrayList<String>();
+		editInput.addAll(inputString);
+		editInput.set(indexFirstQuantifier, "+");
+		String variables = inputString.get(indexFirstQuantifier + 1);
+
+		// divide in case of functions or variables like "xyz"
+
+		String[] tempElements = variables.split("");
+		ArrayList<String> temp = ArrayToArrayList(tempElements);
+
+		// variables for comparison
+		allVariables.addAll(temp);
+
+		int occurances = Collections.frequency(inputString, "$")
+				+ Collections.frequency(inputString, "&");
+		int startingIndex;
+
+		// intialize dictionary for the quantifier
+		boolean firstTime = true;
+		// don't count the first bracket
+		boolean firstBracket = true;
+
+		for (int i = 0; i < occurances; i++) {
+			firstTime = true;
+			firstBracket = true;
+			ArrayList<String> originalValues = new ArrayList<String>();
+			ArrayList<String> replacementValues = new ArrayList<String>();
+
+			startingIndex = firstQuantifier(editInput) + 1;
+			if (startingIndex <= 0) {
+				break;
+			} else {
+				editInput.set(startingIndex - 1, "+");
+			}
+			int countingBrackets = 1;
+			while (countingBrackets != 0) {
+				// setting the dictionary for the quantifier parameters
+				if (firstTime == true) {
+					firstTime = false;
+					variables = inputString.get(startingIndex);
+					tempElements = variables.split("");
+					replacementValues = ArrayToArrayList(tempElements);
+					originalValues.addAll(replacementValues);
+					for (int j = 0; j < replacementValues.size(); j++) {
+						if (allVariables.contains(replacementValues.get(j))) {
+							// look for an unused variable
+							Random r = new Random();
+							char c = (char) (r.nextInt(26) + 'a');
+							String s = c + "";
+							while (inputString.contains(s)
+									&& allVariables.contains(s)) {
+								c = (char) (r.nextInt(26) + 'a');
+								s = c + "";
+							}
+							replacementValues.set(j, s);
+
+						}
+
+					}
+					// merge the new variables
+					String all = mergeArrayList(replacementValues);
+					editInput.set(startingIndex, all);
+					inputString.set(startingIndex, all);
+
+				} else if (firstBracket) {
+					// skip 1st bracket already counted
+					firstBracket = false;
+				} else if (editInput.get(startingIndex).equals(FORALL)
+						|| editInput.get(startingIndex).equals(THERE_EXISTS)) {
+
+					// skip if encountering sub-quantifiers
+					startingIndex = skipSubQuantifier(countingBrackets,
+							startingIndex, editInput);
+
+				} else if (editInput.get(startingIndex).equals(
+						RIGHT_SQUARE_BRACKET)) {
+					countingBrackets--;
+				} else if (editInput.get(startingIndex).equals(
+						LEFT_SQUARE_BRACKET)) {
+					countingBrackets++;
+				} else {
+					// if function or variable replace or leave it accordingly
+					variables = inputString.get(startingIndex);
+					tempElements = variables.split("");
+					temp = ArrayToArrayList(tempElements);
+
+					for (int j = 0; j < temp.size(); j++) {
+						if (originalValues.contains(temp.get(j))) {
+
+							String letter = temp.get(j);
+							int location = originalValues.indexOf(letter);
+							temp.set(j, replacementValues.get(location));
+						}
+					}
+
+					String all = mergeArrayList(temp);
+					editInput.set(startingIndex, all);
+					inputString.set(startingIndex, all);
+
+				}
+				startingIndex++;
+
+			}
+			// add the new variables to the global list and search for another
+			// quantifier
+			allVariables.addAll(replacementValues);
+
+		}
+
+		return inputString;
+	}
+
+	public int skipSubQuantifier(int countingBrackets, int startingIndex,
+			ArrayList<String> editInput) {
+		int lastCount = countingBrackets;
+		startingIndex = startingIndex + 3;
+		lastCount = lastCount + 1;
+		while (lastCount != startingIndex) {
+			if (editInput.get(startingIndex).equals(RIGHT_SQUARE_BRACKET)) {
+				lastCount--;
+
+			} else if (editInput.get(startingIndex).equals(LEFT_SQUARE_BRACKET)) {
+				lastCount++;
+			}
+			startingIndex++;
+		}
+		return startingIndex;
+	}
+
 	private ArrayList<String> pushNotInwards(ArrayList<String> elements) {
-		//case 1 - two nots followed by each other - remove both
+		// case 1 - two nots followed by each other - remove both
 		ArrayList<String> twoNots = new ArrayList<String>(2);
-		twoNots.add(NOT); twoNots.add(NOT);
+		twoNots.add(NOT);
+		twoNots.add(NOT);
 		elements.removeAll(twoNots);
-		
-		//case 2 - not followed by a bracketed expression eg ! ( p v q )
-		
+
+		// case 2 - not followed by a bracketed expression eg ! ( p v q )
+
 		return elements;
 	}
 
 	private boolean notInwardsFinished(ArrayList<String> elements) {
 		boolean finished = true;
 		for (int i = 0; i < elements.size() - 1; i++) {
-			if(elements.get(i).equals(NOT) && !Character.isLetter(elements.get(i+1).charAt(0))){
+			if (elements.get(i).equals(NOT)
+					&& !Character.isLetter(elements.get(i + 1).charAt(0))) {
 				finished = false;
 			}
 		}
@@ -289,6 +462,15 @@ public class AIProject {
 		// close first opening bracket
 		temp.add(RIGHT_SQUARE_BRACKET);
 		return temp;
+	}
+
+	public String mergeArrayList(ArrayList<String> arraylist) {
+		String output = "";
+
+		for (String e : arraylist) {
+			output = output + e;
+		}
+		return output;
 	}
 
 	public void printArrayList(ArrayList<String> arraylist) {
