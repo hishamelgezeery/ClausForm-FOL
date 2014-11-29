@@ -25,12 +25,27 @@ public class AIProject {
 		// Scanner sc = new Scanner(System.in);
 		// System.out.println("Please enter the sentence!");
 		// String FOLSentence = sc.nextLine();
-
+		//
 		String test = "$xy [ p(x) <=> q(x) ^ [ Q(x) ^ &y [ Q(y) ^ R(y, x) ] ] ] ";
+		// /////////////////////////////
+		// IMPLIES
 		String testIMPLIES = "[ [ p(x) ] => q(x) ]";
+		// ///////////////////////
 		String testNOT = "[ ! ! p ] => [ ! ! q ]";
+
+		// /////////////////////////
+		// RENAMING
 		String testVARIABLES = "$ xy [ x ^ y ] | & yst [ p(y) ^ s ^ x ] ^ & sy [ s ^ y ] | $ ts [ t ^ s ] ";
 		String testVARIABLES2 = "$ x [ p(x) ^ $ x [ q(x) ^ p(x) ] ]";
+
+		// /////////////////////////////
+		// NOT
+		String test2 = "[ [ p(x) ] => q(x) ]";
+		String test3 = "[ ! ! p ] => [ ! ! q ]";
+		String tst = "$x [ p(x) <=> q(x) ]";
+		String tst2 = "$x ! [ p(x) | q(x) ] ";
+		String tst3 = "$x ! [ p(x) ^ [ q(x) ^ r(x) ] ]";
+		// //////////////////////////////
 		AIProject a = new AIProject();
 		a.clauseForm(testVARIABLES2);
 
@@ -231,8 +246,44 @@ public class AIProject {
 		twoNots.add(NOT);
 		elements.removeAll(twoNots);
 
-		// case 2 - not followed by a bracketed expression eg ! ( p v q )
+		// case 3 - NOT followed by a bracketed expression e.g. ! [p V q]
+		int notIndex = elements.indexOf(NOT);
+		int ptr = notIndex + 1;
 
+		if (elements.get(notIndex + 2).equals(LEFT_SQUARE_BRACKET)) {
+			System.out.println("hello");
+
+			while (ptr < elements.size()
+					&& (!elements.get(ptr).equals(RIGHT_SQUARE_BRACKET))) {
+
+				if ((Character.isLetter(elements.get(ptr).charAt(0)))) {
+					elements.add(ptr, NOT);
+					ptr++;
+				}
+
+				if (elements.get(ptr).equals(AND)) {
+					elements.set(ptr, OR);
+					ptr++;
+				}
+
+				if (elements.get(ptr).equals(OR)) {
+					elements.set(ptr, AND);
+					ptr++;
+				}
+
+				ptr++;
+			}
+
+			/*
+			 * while(!elements.get(ptr).equals(RIGHT_SQUARE_BRACKET) ||
+			 * ptr<elements.size()){
+			 * if(Character.isLetter(elements.get(ptr).charAt(0)))
+			 * elements.add(ptr, NOT);
+			 * 
+			 * ptr++; }
+			 */
+		}
+		// case 2 - not followed by a bracketed expression eg ! ( p v q )
 		return elements;
 	}
 
@@ -297,21 +348,23 @@ public class AIProject {
 	// REMOVE EQUIVELENCE/////////////////////////////
 	public ArrayList<String> removeEquiv(ArrayList<String> inputString) {
 		int equivIndex = inputString.indexOf(EQUIVALENCE);
-		// case of two functions eg. p(x) <=> q(x)
+		// case#1 of two functions eg. p(x) <=> q(x)
 		if (!inputString.get(equivIndex - 1).equals(RIGHT_SQUARE_BRACKET)
 				&& !inputString.get(equivIndex + 1).equals(LEFT_SQUARE_BRACKET)) {
 			inputString = removeEquivCaseOne(inputString, equivIndex);
 		}
-		// case of two bracketed parameters eg. [p(x)^q(x)]<=>[q(y)^q(z)]
+		// case#2 of two bracketed parameters eg. [p(x)^q(x)]<=>[q(y)^q(z)]
 		if (inputString.get(equivIndex - 1).equals(RIGHT_SQUARE_BRACKET)
 				&& inputString.get(equivIndex + 1).equals(LEFT_SQUARE_BRACKET)) {
 			inputString = removeEquivCaseTwo(inputString, equivIndex);
 		}
-		// case of two bracketed parameters eg. [p(x)^q(x)]<=>[q(y)^q(z)]
+		// case#3 of a fuunction iff a bracketed parameter eg.
+		// p(x)<=>[q(y)^q(z)]
 		if (!inputString.get(equivIndex - 1).equals(RIGHT_SQUARE_BRACKET)
 				&& inputString.get(equivIndex + 1).equals(LEFT_SQUARE_BRACKET)) {
 			inputString = removeEquivCaseThree(inputString, equivIndex);
 		}
+		// case#4: a bracketed parameter iff a function eg. [q(y)^q(z)]<=>p(x)
 		if (!inputString.get(equivIndex + 1).equals(LEFT_SQUARE_BRACKET)
 				&& inputString.get(equivIndex - 1).equals(RIGHT_SQUARE_BRACKET)) {
 			inputString = removeEquivCaseFour(inputString, equivIndex);
