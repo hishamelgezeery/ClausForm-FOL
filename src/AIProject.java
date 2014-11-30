@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -26,38 +27,31 @@ public class AIProject {
 		// System.out.println("Please enter the sentence!");
 		// String FOLSentence = sc.nextLine();
 		//
-		String test = "$xy [ p(x) <=> q(x) ^ [ Q(x) ^ &y [ Q(y) ^ R(y, x) ] ] ] ";
-		// /////////////////////////////
-		// IMPLIES
-		String testIMPLIES = "[ [ p(x) ] => q(x) ]";
-		// ///////////////////////
+		String test = "$ xy [ p(x) <=> q(x) ^ [ Q(x) ^ & y [ Q(y) ^ R(y,x) ] ] ] ";
 		String testNOT = "[ ! ! p ] => [ ! ! q ]";
-
-		// /////////////////////////
-		// RENAMING
-		String testVARIABLES = "$ xy [ x ^ y ] | & yst [ p(y) ^ s ^ x ] ^ & sy [ s ^ y ] | $ ts [ t ^ s ] ";
-		String testVARIABLES2 = "$ x [ p(x) ^ $ x [ q(x) ^ p(x) ] ]";
-
+		test = " [ x | y ] ^ [ x | x ] ";
 		// /////////////////////////////
 		// NOT
-		String test2 = "[ [ p(x) ] => q(x) ]";
+
 		String test3 = "[ ! ! p ] => [ ! ! q ]";
-		String tst = "$x [ p(x) <=> q(x) ]";
 		String tst2 = "$x ! [ p(x) | q(x) ] ";
 		String tst3 = "$x ! [ p(x) ^ [ q(x) ^ r(x) ] ]";
 		// //////////////////////////////
+
 		AIProject a = new AIProject();
-		a.clauseForm(testVARIABLES2);
+		a.clauseForm(test);
 
 	}
 
 	public void clauseForm(String FOLSentence) {
+
+		// steps to convert to clause form
+
 		String[] tempElements = FOLSentence.split(" ");
 		ArrayList<String> elements = ArrayToArrayList(tempElements);
 
 		while (elements.contains(EQUIVALENCE)) {
 			elements = removeEquiv(elements);
-			printArrayList(elements);
 		}
 
 		while (elements.contains(IMPLICATION)) {
@@ -68,85 +62,177 @@ public class AIProject {
 		// elements = pushNotInwards(elements);
 		// System.out.println("still here");
 		// }
-		while (elements.contains(IMPLICATION)) {
-			elements = removeImplication(elements);
-		}
 
 		if (elements.contains(FORALL) || elements.contains(THERE_EXISTS)) {
-			int firstQuantifier = firstQuantifier(elements);
-			elements = addVariables(elements, firstQuantifier);
+			elements = addVariables(elements);
 		}
+
+		if (elements.contains(THERE_EXISTS)) {
+			elements = skolemize(elements);
+		}
+
+		elements = removeSpaces(elements);
+
+		while (elements.contains(FORALL)) {
+			elements = removeForAll(elements);
+		}
+
+		elements = divideANDS(elements);
+		elements = clauseFormI(elements);
+		elements = clauseFormII(elements);
+		elements = standarizeApart(elements);
 
 		printArrayList(elements);
 
 	}
 
+	public ArrayList<String> skolemize(ArrayList<String> inputString) {
+
+		// saving all variables throughout the sentence
+		ArrayList<String> allVariables = new ArrayList<String>();
+		// saving original variables in certain quantifier
+		ArrayList<String> originalValues = new ArrayList<String>();
+		// saving replaced variables in certain quantifier
+		ArrayList<String> replacementValues = new ArrayList<String>();
+
+		ArrayList<String> temp;
+		String variables;
+		String[] tempElements;
+		int start;
+		// intialize dictionary for the quantifier
+		boolean firstTime = true;
+
+		while (inputString.contains(THERE_EXISTS)) {
+
+			firstTime = true;
+			originalValues.clear();
+			replacementValues.clear();
+			// look for 1st quantifier with code
+			start = firstQuantifier(inputString, 2) + 1;
+			if (start <= 0) {
+				break;
+			} else {
+				// remove there_exists
+				inputString.set(start - 1, "");
+			}
+
+			for (int startingIndex = start; startingIndex < inputString.size(); startingIndex++) {
+
+				if (firstTime == true) {
+					firstTime = false;
+					variables = inputString.get(startingIndex);
+					tempElements = variables.split("");
+					replacementValues = ArrayToArrayList(tempElements);
+					originalValues.addAll(replacementValues);
+					for (int j = 0; j < replacementValues.size(); j++) {
+
+						// look for an unused variable
+						Random r = new Random();
+						char c = (char) (r.nextInt(26) + 'A');
+						String s = c + "";
+						while (inputString.contains(s)
+								|| allVariables.contains(s)
+								|| replacementValues.contains(s)) {
+
+							c = (char) (r.nextInt(26) + 'A');
+							s = c + "";
+						}
+						replacementValues.set(j, s);
+
+					}
+					// merge the new variables
+					inputString.set(startingIndex, "");
+
+				} else {
+					// if function or variable replace or leave it accordingly
+					variables = inputString.get(startingIndex);
+					tempElements = variables.split("");
+					temp = ArrayToArrayList(tempElements);
+
+					for (int j = 0; j < temp.size(); j++) {
+						if (originalValues.contains(temp.get(j))) {
+
+							String letter = temp.get(j);
+							int location = originalValues.indexOf(letter);
+							temp.set(j, replacementValues.get(location));
+						}
+					}
+
+					String all = mergeArrayList(temp);
+					inputString.set(startingIndex, all);
+
+				}
+
+			}
+			// add the new variables to the global list and search for another
+			// quantifier
+			allVariables.addAll(replacementValues);
+
+		}
+
+		return inputString;
+	}
+
 	// calculating index of the 1st quantifier in arraylist
-	private int firstQuantifier(ArrayList<String> inputString) {
+	public int firstQuantifier(ArrayList<String> inputString, int type) {
+		// type=0 look for any quantifier
+		// type=1 look for forAll
+		// type=2 look for there_exits
 		int temp;
 		int firstQuantifier = -1;
 
-		if (inputString.contains(FORALL)) {
-
+		if (type == 0) {
 			firstQuantifier = inputString.indexOf(FORALL);
-		}
-
-		if (inputString.contains(THERE_EXISTS)) {
 			temp = inputString.indexOf(THERE_EXISTS);
-
 			if (temp < firstQuantifier || firstQuantifier == -1) {
 				firstQuantifier = temp;
 			}
-
+		} else if (type == 1) {
+			firstQuantifier = inputString.indexOf(FORALL);
+		} else if (type == 2) {
+			firstQuantifier = inputString.indexOf(THERE_EXISTS);
 		}
+
 		return firstQuantifier;
 
 	}
 
 	// adding variables
-	private ArrayList<String> addVariables(ArrayList<String> inputString,
-			int indexFirstQuantifier) {
+	public ArrayList<String> addVariables(ArrayList<String> inputString) {
 
 		// initialization for 1st quantifier
 
 		ArrayList<String> editInput = new ArrayList<String>();
 		ArrayList<String> allVariables = new ArrayList<String>();
-		editInput.addAll(inputString);
-		editInput.set(indexFirstQuantifier, "+");
-		String variables = inputString.get(indexFirstQuantifier + 1);
+		ArrayList<String> originalValues = new ArrayList<String>();
+		ArrayList<String> replacementValues = new ArrayList<String>();
 
-		// divide in case of functions or variables like "xyz"
-
-		String[] tempElements = variables.split("");
-		ArrayList<String> temp = ArrayToArrayList(tempElements);
-
-		// variables for comparison
-		allVariables.addAll(temp);
-
+		ArrayList<String> temp;
+		String variables;
+		String[] tempElements;
+		int start;
 		int occurances = Collections.frequency(inputString, "$")
 				+ Collections.frequency(inputString, "&");
-		int startingIndex;
+
+		editInput.addAll(inputString);
 
 		// intialize dictionary for the quantifier
 		boolean firstTime = true;
-		// don't count the first bracket
-		boolean firstBracket = true;
 
 		for (int i = 0; i < occurances; i++) {
 			firstTime = true;
-			firstBracket = true;
-			ArrayList<String> originalValues = new ArrayList<String>();
-			ArrayList<String> replacementValues = new ArrayList<String>();
+			originalValues.clear();
+			replacementValues.clear();
 
-			startingIndex = firstQuantifier(editInput) + 1;
-			if (startingIndex <= 0) {
+			start = firstQuantifier(editInput, 0) + 1;
+			if (start <= 0) {
 				break;
 			} else {
-				editInput.set(startingIndex - 1, "+");
+				editInput.set(start - 1, "+");
 			}
-			int countingBrackets = 1;
-			while (countingBrackets != 0) {
-				// setting the dictionary for the quantifier parameters
+
+			for (int startingIndex = start; startingIndex < inputString.size(); startingIndex++) {
+
 				if (firstTime == true) {
 					firstTime = false;
 					variables = inputString.get(startingIndex);
@@ -160,7 +246,8 @@ public class AIProject {
 							char c = (char) (r.nextInt(26) + 'a');
 							String s = c + "";
 							while (inputString.contains(s)
-									&& allVariables.contains(s)) {
+									|| allVariables.contains(s)
+									|| replacementValues.contains(s)) {
 								c = (char) (r.nextInt(26) + 'a');
 								s = c + "";
 							}
@@ -174,22 +261,6 @@ public class AIProject {
 					editInput.set(startingIndex, all);
 					inputString.set(startingIndex, all);
 
-				} else if (firstBracket) {
-					// skip 1st bracket already counted
-					firstBracket = false;
-				} else if (editInput.get(startingIndex).equals(FORALL)
-						|| editInput.get(startingIndex).equals(THERE_EXISTS)) {
-
-					// skip if encountering sub-quantifiers
-					startingIndex = skipSubQuantifier(countingBrackets,
-							startingIndex, editInput);
-
-				} else if (editInput.get(startingIndex).equals(
-						RIGHT_SQUARE_BRACKET)) {
-					countingBrackets--;
-				} else if (editInput.get(startingIndex).equals(
-						LEFT_SQUARE_BRACKET)) {
-					countingBrackets++;
 				} else {
 					// if function or variable replace or leave it accordingly
 					variables = inputString.get(startingIndex);
@@ -210,7 +281,6 @@ public class AIProject {
 					inputString.set(startingIndex, all);
 
 				}
-				startingIndex++;
 
 			}
 			// add the new variables to the global list and search for another
@@ -220,23 +290,6 @@ public class AIProject {
 		}
 
 		return inputString;
-	}
-
-	public int skipSubQuantifier(int countingBrackets, int startingIndex,
-			ArrayList<String> editInput) {
-		int lastCount = countingBrackets;
-		startingIndex = startingIndex + 3;
-		lastCount = lastCount + 1;
-		while (lastCount != startingIndex) {
-			if (editInput.get(startingIndex).equals(RIGHT_SQUARE_BRACKET)) {
-				lastCount--;
-
-			} else if (editInput.get(startingIndex).equals(LEFT_SQUARE_BRACKET)) {
-				lastCount++;
-			}
-			startingIndex++;
-		}
-		return startingIndex;
 	}
 
 	private ArrayList<String> pushNotInwards(ArrayList<String> elements) {
@@ -542,6 +595,160 @@ public class AIProject {
 			wordList.add(e);
 		}
 		return wordList;
+	}
+
+	public ArrayList<String> removeForAll(ArrayList<String> inputString) {
+
+		int firstForAll = firstQuantifier(inputString, 1);
+		inputString.remove(firstForAll);
+		inputString.remove(firstForAll);
+
+		return inputString;
+	}
+
+	// replace square brackets with braces
+	public ArrayList<String> addBraces(ArrayList<String> inputString) {
+
+		while (inputString.contains(LEFT_SQUARE_BRACKET)
+				|| inputString.contains(RIGHT_SQUARE_BRACKET)) {
+			int left = inputString.indexOf(LEFT_SQUARE_BRACKET);
+			int right = inputString.indexOf(RIGHT_SQUARE_BRACKET);
+
+			if (left != -1) {
+				inputString.set(left, "{");
+			}
+			if (right != -1) {
+				inputString.set(right, "}");
+			}
+
+		}
+		return inputString;
+	}
+
+	// replace AND and OR with commas
+	public ArrayList<String> addCommas(ArrayList<String> inputString,
+			String symbol) {
+		while (inputString.contains(symbol)) {
+			int symbolIndex = inputString.indexOf(symbol);
+			if (symbolIndex != -1) {
+				inputString.set(symbolIndex, ",");
+			}
+
+		}
+
+		return inputString;
+	}
+
+	// divide array between ANDs
+	public ArrayList<String> divideANDS(ArrayList<String> inputString) {
+
+		while (inputString.contains(LEFT_SQUARE_BRACKET)
+				|| inputString.contains(RIGHT_SQUARE_BRACKET)) {
+			inputString.remove(LEFT_SQUARE_BRACKET);
+			inputString.remove(RIGHT_SQUARE_BRACKET);
+		}
+
+		// look for each AND
+		ArrayList<String> editOriginal = new ArrayList<String>();
+
+		inputString.add(0, LEFT_SQUARE_BRACKET);
+		editOriginal.addAll(inputString);
+
+		while (editOriginal.contains(AND)) {
+			int index = editOriginal.indexOf(AND);
+			inputString.add(index + 1, LEFT_SQUARE_BRACKET);
+			inputString.add(index, RIGHT_SQUARE_BRACKET);
+
+			editOriginal.set(index, "+");
+			editOriginal.add(index + 1, LEFT_SQUARE_BRACKET);
+			editOriginal.add(index, RIGHT_SQUARE_BRACKET);
+		}
+
+		inputString.add(inputString.size(), RIGHT_SQUARE_BRACKET);
+
+		return inputString;
+	}
+
+	// remove white spaces in array, used when removing forAll and There Exists
+	public ArrayList<String> removeSpaces(ArrayList<String> inputString) {
+
+		while (inputString.contains("")) {
+			inputString.remove("");
+		}
+
+		return inputString;
+	}
+
+	public ArrayList<String> clauseFormI(ArrayList<String> inputString) {
+
+		inputString = addBraces(inputString);
+		inputString = addCommas(inputString, OR);
+
+		return inputString;
+	}
+
+	public ArrayList<String> clauseFormII(ArrayList<String> inputString) {
+
+		inputString.add(0, LEFT_CURLY_BRACE);
+		inputString.add(inputString.size(), RIGHT_CURLY_BRACE);
+		inputString = addCommas(inputString, AND);
+
+		return inputString;
+	}
+
+	//checking that no two variables have the same name in same clause
+	public ArrayList<String> standarizeApart(ArrayList<String> inputString) {
+
+		ArrayList<String> allVariables = new ArrayList<String>();
+		ArrayList<String> temporaryVariables = new ArrayList<String>();
+		ArrayList<String> temp = null;
+
+		int uniqness = 0;
+		int countingBrackets = 0;
+
+		for (int i = 0; i < inputString.size(); i++) {
+			if (inputString.get(i).equals(LEFT_CURLY_BRACE)) {
+				countingBrackets++;
+			} else if (inputString.get(i).equals(RIGHT_CURLY_BRACE)) {
+				countingBrackets--;
+			} else if (countingBrackets == 1) {
+				//when brackets are closed, new clause detected
+				allVariables.addAll(temporaryVariables);
+				temporaryVariables.clear();
+				uniqness++;
+
+			} else {
+				// if function or variable replace or leave it accordingly
+				String variables = inputString.get(i);
+				String[] tempElements = variables.split("");
+				temp = ArrayToArrayList(tempElements);
+
+				for (int j = 0; j < temp.size(); j++) {
+					if (temp.size() > 1) {
+						if ((temp.get(j).matches(".*[a-z].*") || temp.get(j)
+								.matches(".*[A-Z].*"))
+								&& (!temp.get(j + 1).equals(LEFT_BRACE))) {
+							temporaryVariables.add(temp.get(j));
+						}
+					} else if (temp.size() == 1) {
+						if ((temp.get(j).matches(".*[a-z].*") || temp.get(j)
+								.matches(".*[A-Z].*"))) {
+							temporaryVariables.add(temp.get(j));
+						}
+					}
+
+					if (allVariables.contains(temp.get(j))) {
+
+						String letter = temp.get(j) + uniqness;
+						temp.set(j, letter);
+					}
+				}
+				String all = mergeArrayList(temp);
+				inputString.set(i, all);
+			}
+		}
+
+		return inputString;
 	}
 
 }
