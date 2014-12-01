@@ -36,10 +36,14 @@ public class AIProject {
 		String test3 = "[ ! ! p ] => [ ! ! q ]";
 		String tst2 = "$x ! [ p(x) | q(x) ] ";
 		String tst3 = "$x ! [ p(x) ^ [ q(x) ^ r(x) ] ]";
+		String tst = "$ x ! [ p(x) ^ q(x) ] | [ r(s) ]";
+		String tstrrr = "$ x ! [ p(x) | q(x) ]";
+		String tstrrr2 = "$ x ! [ p(x) | q(x) ] | s(x)";
+		String tstrrr3 = "$ x ! [ p(x) | q(x) | s(x) ]";
 		// //////////////////////////////
 
 		AIProject a = new AIProject();
-		a.clauseForm(test);
+		a.clauseForm(tstrrr3);
 
 	}
 
@@ -58,10 +62,9 @@ public class AIProject {
 			elements = removeImplication(elements);
 		}
 
-		// while (!notInwardsFinished(elements)) {
-		// elements = pushNotInwards(elements);
-		// System.out.println("still here");
-		// }
+		while (!notInwardsFinished(elements)) {
+			elements = pushNotInwards(elements);
+		}
 
 		if (elements.contains(FORALL) || elements.contains(THERE_EXISTS)) {
 			elements = addVariables(elements);
@@ -293,50 +296,70 @@ public class AIProject {
 	}
 
 	private ArrayList<String> pushNotInwards(ArrayList<String> elements) {
-		// case 1 - two nots followed by each other - remove both
-		ArrayList<String> twoNots = new ArrayList<String>(2);
-		twoNots.add(NOT);
-		twoNots.add(NOT);
-		elements.removeAll(twoNots);
+		// case 1 - two nots followed by each other then remove both
+		int size = elements.size() - 1;
+		for (int i = 0; i < size; i++) {
+			if (elements.get(i).equals(elements.get(i + 1))
+					&& elements.get(i).equals(NOT)) {
+				elements.remove(i);
+				size--;
+				elements.remove(i);
+				size--;
+			}
+		}
 
-		// case 3 - NOT followed by a bracketed expression e.g. ! [p V q]
+		// case 2 - NOT followed by a bracketed expression e.g. ! [p V q]
 		int notIndex = elements.indexOf(NOT);
+		int lsqcount = 0;
+		int rsqcount = 0;
+		elements.remove(notIndex);
+		notIndex--;
 		int ptr = notIndex + 1;
+		int iterations = 0;
+		boolean flag = false;
+		if (elements.get(ptr).equals(LEFT_SQUARE_BRACKET))
+			lsqcount++;
 
-		if (elements.get(notIndex + 2).equals(LEFT_SQUARE_BRACKET)) {
-			System.out.println("hello");
+		if (elements.get(ptr).equals(RIGHT_SQUARE_BRACKET))
+			rsqcount++;
 
-			while (ptr < elements.size()
-					&& (!elements.get(ptr).equals(RIGHT_SQUARE_BRACKET))) {
-
-				if ((Character.isLetter(elements.get(ptr).charAt(0)))) {
-					elements.add(ptr, NOT);
-					ptr++;
-				}
-
-				if (elements.get(ptr).equals(AND)) {
-					elements.set(ptr, OR);
-					ptr++;
-				}
-
-				if (elements.get(ptr).equals(OR)) {
-					elements.set(ptr, AND);
-					ptr++;
-				}
-
-				ptr++;
+		int end = elements.size() - 1;
+		while (ptr <= end && lsqcount != rsqcount) {
+			if (iterations == 0) {
+				flag = false;
+				iterations++;
 			}
 
-			/*
-			 * while(!elements.get(ptr).equals(RIGHT_SQUARE_BRACKET) ||
-			 * ptr<elements.size()){
-			 * if(Character.isLetter(elements.get(ptr).charAt(0)))
-			 * elements.add(ptr, NOT);
-			 * 
-			 * ptr++; }
-			 */
+			else
+				flag = true;
+
+			if (flag) {
+				if (elements.get(ptr).equals(LEFT_SQUARE_BRACKET))
+					lsqcount++;
+
+				if (elements.get(ptr).equals(RIGHT_SQUARE_BRACKET))
+					rsqcount++;
+			}
+
+			if (Character.isLetter(elements.get(ptr).charAt(0))) {
+				elements.add(ptr, NOT);
+				ptr++;
+				end++;
+
+			} else if (elements.get(ptr).equals(AND)) {
+				elements.set(ptr, OR);
+			}
+
+			else if (elements.get(ptr).equals(OR)) {
+				elements.set(ptr, AND);
+
+			}
+
+			else {
+			}
+			ptr++;
 		}
-		// case 2 - not followed by a bracketed expression eg ! ( p v q )
+
 		return elements;
 	}
 
@@ -696,7 +719,7 @@ public class AIProject {
 		return inputString;
 	}
 
-	//checking that no two variables have the same name in same clause
+	// checking that no two variables have the same name in same clause
 	public ArrayList<String> standarizeApart(ArrayList<String> inputString) {
 
 		ArrayList<String> allVariables = new ArrayList<String>();
@@ -712,7 +735,7 @@ public class AIProject {
 			} else if (inputString.get(i).equals(RIGHT_CURLY_BRACE)) {
 				countingBrackets--;
 			} else if (countingBrackets == 1) {
-				//when brackets are closed, new clause detected
+				// when brackets are closed, new clause detected
 				allVariables.addAll(temporaryVariables);
 				temporaryVariables.clear();
 				uniqness++;
