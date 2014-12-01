@@ -25,7 +25,7 @@ public class AIProject {
 	static boolean trace = false;
 
 	public static void main(String[] args) {
-		///////////////////Some Examples///////////////////////////////////////
+		// /////////////////Some Examples///////////////////////////////////////
 		String test = "$ xy [ p(x) <=> q(x) ^ [ Q(x) ^ & y [ Q(y) ^ R(y,x) ] ] ] ";
 		String testNOT = "[ ! ! p ] => [ ! ! q ]";
 		test = " [ x | y ] ^ [ x | x ] ";
@@ -37,9 +37,9 @@ public class AIProject {
 		String tstrrr2 = "$ x ! [ p(x) | q(x) ] | s(x)";
 		String tstrrr3 = "$ x ! [ p(x) | q(x) | s(x) ]";
 		String cnftranslation = "$ x [ p(x) | [ q(x) ^ r(x) ] ]";
-		///////////////////////////// TEST CASES//////////////////////////////
+		// /////////////////////////// TEST CASES//////////////////////////////
 		// //////////////////////////////////
-		String testCase1 = "& x [P(x) ^ $ x [ Q(x) => ! P(x) ] ]";
+		String testCase1 = "& x [ P(x) ^ $ x [ Q(x) => ! P(x) ] ]";
 		String testCase2 = "$ x [ P(x) <=> [ Q(x) ^ & y [ Q(y) ^ R(y,x) ] ] ]";
 		AIProject a = new AIProject();
 		a.trace = true;
@@ -246,7 +246,7 @@ public class AIProject {
 		if (type == 0) {
 			firstQuantifier = inputString.indexOf(FORALL);
 			temp = inputString.indexOf(THERE_EXISTS);
-			if (temp < firstQuantifier || firstQuantifier == -1) {
+			if ((temp < firstQuantifier || firstQuantifier == -1) && temp != -1) {
 				firstQuantifier = temp;
 			}
 		} else if (type == 1) {
