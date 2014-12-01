@@ -1,3 +1,4 @@
+import java.awt.image.RescaleOp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,18 +22,13 @@ public class AIProject {
 	final static String RIGHT_BRACE = ")";
 	final static String RIGHT_CURLY_BRACE = "}";
 	final static String LEFT_CURLY_BRACE = "{";
+	static boolean trace = false;
 
 	public static void main(String[] args) {
-		// Scanner sc = new Scanner(System.in);
-		// System.out.println("Please enter the sentence!");
-		// String FOLSentence = sc.nextLine();
-		//
+		///////////////////Some Examples///////////////////////////////////////
 		String test = "$ xy [ p(x) <=> q(x) ^ [ Q(x) ^ & y [ Q(y) ^ R(y,x) ] ] ] ";
 		String testNOT = "[ ! ! p ] => [ ! ! q ]";
 		test = " [ x | y ] ^ [ x | x ] ";
-		// /////////////////////////////
-		// NOT
-
 		String test3 = "[ ! ! p ] => [ ! ! q ]";
 		String tst2 = "$x ! [ p(x) | q(x) ] ";
 		String tst3 = "$x ! [ p(x) ^ [ q(x) ^ r(x) ] ]";
@@ -40,10 +36,16 @@ public class AIProject {
 		String tstrrr = "$ x ! [ p(x) | q(x) ]";
 		String tstrrr2 = "$ x ! [ p(x) | q(x) ] | s(x)";
 		String tstrrr3 = "$ x ! [ p(x) | q(x) | s(x) ]";
-		// //////////////////////////////
-
+		String cnftranslation = "$ x [ p(x) | [ q(x) ^ r(x) ] ]";
+		///////////////////////////// TEST CASES//////////////////////////////
+		// //////////////////////////////////
+		String testCase1 = "& x [P(x) ^ $ x [ Q(x) => ! P(x) ] ]";
+		String testCase2 = "$ x [ P(x) <=> [ Q(x) ^ & y [ Q(y) ^ R(y,x) ] ] ]";
 		AIProject a = new AIProject();
-		a.clauseForm(tstrrr3);
+		a.trace = true;
+		a.clauseForm(testCase1);
+		a.clauseForm(testCase2);
+		// ///////////////////////////////////////////////////////////////////////////
 
 	}
 
@@ -54,24 +56,54 @@ public class AIProject {
 		String[] tempElements = FOLSentence.split(" ");
 		ArrayList<String> elements = ArrayToArrayList(tempElements);
 
+		if (trace) {
+
+			System.out.print("Original Input: ");
+			printArrayList(elements);
+		}
+
 		while (elements.contains(EQUIVALENCE)) {
 			elements = removeEquiv(elements);
+		}
+		if (trace) {
+
+			System.out.print("After Equivalence Elimination: ");
+			printArrayList(elements);
 		}
 
 		while (elements.contains(IMPLICATION)) {
 			elements = removeImplication(elements);
 		}
+		if (trace) {
 
+			System.out.print("After Implication Elimination: ");
+			printArrayList(elements);
+		}
 		while (!notInwardsFinished(elements)) {
 			elements = pushNotInwards(elements);
+		}
+		if (trace) {
+
+			System.out.print("After Pushing Not Inwards: ");
+			printArrayList(elements);
 		}
 
 		if (elements.contains(FORALL) || elements.contains(THERE_EXISTS)) {
 			elements = addVariables(elements);
 		}
+		if (trace) {
+
+			System.out.print("After Standardizing Apart: ");
+			printArrayList(elements);
+		}
 
 		if (elements.contains(THERE_EXISTS)) {
 			elements = skolemize(elements);
+		}
+		if (trace) {
+
+			System.out.print("After Skolemizing: ");
+			printArrayList(elements);
 		}
 
 		elements = removeSpaces(elements);
@@ -79,12 +111,39 @@ public class AIProject {
 		while (elements.contains(FORALL)) {
 			elements = removeForAll(elements);
 		}
+		if (trace) {
+
+			System.out.print("After Discarding For All Quantifier: ");
+			printArrayList(elements);
+		}
+
+		while (!CNfTranslationNotPossible(elements)) {
+			elements = CNFTransformation(elements);
+		}
+		if (trace) {
+
+			System.out.print("After Translating Into CNF: ");
+			printArrayList(elements);
+		}
+
+		// System.out.println(CNfTranslationNotPossible(elements));
+		// System.out.println(CNFSuccessStartIndex(elements));
+		// System.out.println(CNFTransformation(elements));
 
 		elements = divideANDS(elements);
 		elements = clauseFormI(elements);
 		elements = clauseFormII(elements);
 		elements = standarizeApart(elements);
 
+		if (trace) {
+			System.out
+					.print("After flatten nested conjunctions and disjunctions: ");
+			printArrayList(elements);
+
+		}
+
+		// printArrayList(elements);
+		System.out.print("Final Result: ");
 		printArrayList(elements);
 
 	}
@@ -363,6 +422,8 @@ public class AIProject {
 		return elements;
 	}
 
+	// this method returns true if and only if all pushing inwards has been done
+	// successfully
 	private boolean notInwardsFinished(ArrayList<String> elements) {
 		boolean finished = true;
 		for (int i = 0; i < elements.size() - 1; i++) {
@@ -372,6 +433,120 @@ public class AIProject {
 			}
 		}
 		return finished;
+	}
+
+	// checks whether the given input is a Function or not
+	private boolean isFunction(String s) {
+		if (Character.isLetter(s.charAt(0)))
+			return true;
+		return false;
+	}
+
+	// checks whether the given input can be transformed using the rule:
+	// [ P(x) | [ Q(x) ^ R(x) ] ] or alternatively
+	// [ P(x) ^ [ Q(x) | R(x) ] ]
+	private boolean CNFTransformationHelper(ArrayList<String> elements,
+			int startindex) {
+		if (elements.size() - startindex < 9 && startindex != 0)
+			return false;
+
+		else {
+			if (elements.get(startindex).equals(LEFT_SQUARE_BRACKET)
+					&& isFunction(elements.get(startindex + 1))
+					&& (elements.get(startindex + 2).equals(OR) || elements
+							.get(startindex + 2).equals(AND))
+					&& elements.get(startindex + 3).equals(LEFT_SQUARE_BRACKET)
+					&& isFunction(elements.get(startindex + 4))
+					&& (elements.get(startindex + 5).equals(AND) || elements
+							.get(startindex + 5).equals(AND))
+					&& isFunction(elements.get(startindex + 6))
+					&& elements.get(startindex + 7)
+							.equals(RIGHT_SQUARE_BRACKET)
+					&& elements.get(startindex + 8)
+							.equals(RIGHT_SQUARE_BRACKET)
+					&& !elements.get(startindex + 2).equals(
+							elements.get(startindex + 5))) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+
+	}
+
+	// Uses the helper method above to detect such a sequence such that either
+	// rules
+	// [ P(x) | [ Q(x) ^ R(x) ] ] or alternatively
+	// [ P(x) ^ [ Q(x) | R(x) ] ] can be transformed
+	private boolean CNfTranslationNotPossible(ArrayList<String> elements) {
+		boolean nomore = true;
+		for (int i = 0; i < elements.size() - 1; i++) {
+			if (CNFTransformationHelper(elements, i)) {
+				return false;
+			}
+		}
+		return nomore;
+	}
+
+	// Simply passes the very first index of the sequence needed in both
+	// previous methods
+	private int CNFSuccessStartIndex(ArrayList<String> elements) {
+		for (int i = 0; i < elements.size() - 1; i++) {
+			if (CNFTransformationHelper(elements, i)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	// This method does the CNFTransformation after the sequence has been
+	// successfully detected
+	// and the Transformation can start now
+	private ArrayList<String> CNFTransformation(ArrayList<String> elements) {
+		ArrayList<String> result = new ArrayList<String>();
+
+		if (!CNfTranslationNotPossible(elements)) {
+			int successIndex = CNFSuccessStartIndex(elements);
+
+			for (int i = 0; i < successIndex; i++) {
+				result.add(elements.get(i));
+			}
+			// [ P(x) | [ Q(x) ^ R(x) ] ]
+			if (elements.get(successIndex + 5).equals(AND)) {
+				result.add(LEFT_SQUARE_BRACKET);
+				result.add(LEFT_SQUARE_BRACKET);
+				result.add(elements.get(successIndex + 1));
+				result.add(OR);
+				result.add(elements.get(successIndex + 4));
+				result.add(RIGHT_SQUARE_BRACKET);
+				result.add(AND);
+				result.add(LEFT_SQUARE_BRACKET);
+				result.add(elements.get(successIndex + 1));
+				result.add(OR);
+				result.add(elements.get(successIndex + 6));
+				result.add(RIGHT_SQUARE_BRACKET);
+				result.add(RIGHT_SQUARE_BRACKET);
+			}
+			// [ P(x) ^ [ Q(x) | R(x) ] ]
+			if (elements.get(successIndex + 5).equals(OR)) {
+				result.add(LEFT_SQUARE_BRACKET);
+				result.add(LEFT_SQUARE_BRACKET);
+				result.add(elements.get(successIndex + 1));
+				result.add(AND);
+				result.add(elements.get(successIndex + 4));
+				result.add(RIGHT_SQUARE_BRACKET);
+				result.add(OR);
+				result.add(LEFT_SQUARE_BRACKET);
+				result.add(elements.get(successIndex + 1));
+				result.add(AND);
+				result.add(elements.get(successIndex + 6));
+				result.add(RIGHT_SQUARE_BRACKET);
+				result.add(RIGHT_SQUARE_BRACKET);
+			}
+
+		}
+		return result;
+
 	}
 
 	private ArrayList<String> removeImplication(ArrayList<String> inputString) {
